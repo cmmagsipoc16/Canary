@@ -12,7 +12,12 @@ void connect_mqttBroker(){
     else{
       Serial.print("Failed with state ");
       Serial.println(client.state());
+      // Forget wifi and mqtt credentials and reset ESP
+      forget_network();
+      Serial.println("wifi and mqtt disconnected and forgotten!");
+      ESP.reset();
       delay(2000);
+  
     }
   }
 }

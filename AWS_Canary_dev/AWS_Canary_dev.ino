@@ -1,3 +1,5 @@
+// Don't forget to sketch data upload Certificate and Private Key, both in DER format to ESP flash! For SSL AWS authentication
+
 //*****Libraries*****//
 #include <FS.h>                    //this needs to be first, or it all crashes and burns...
 //For connecting to wifi and mqtt server
@@ -13,25 +15,21 @@
 //For MQTT publish/subscribe
 #include <PubSubClient.h>         //https://github.com/knolleary/pubsubclient
 
-LiquidCrystal_I2C lcd(0x3F, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE);
-SoftwareSerial pmsSerial(14, 13);
 
-WiFiClient espClient;
-PubSubClient client(espClient);
-
-//*****Declarations*****//
+//*****Definitions*****//
 #define SDA_PIN  5
 #define SCL_PIN  4
 
 ////For MQTT
-//flag for saving data
-bool shouldSaveConfig = false;
+bool shouldSaveConfig = false;      //flag for saving data
 
 //define your default values here, if there are different values in config.json, they are overwritten.
-char mqtt_server[40] = "ip add of hosting Rpi";
-char mqtt_port[6] = "1883";
-char mqtt_user[20] = "mqtt_user";
+char mqtt_server[60] = "example-ats.iot.ap-southeast-1.amazonaws.com";   //ip add of rpi or AWS endpoint
+char mqtt_port[6] = "8883";           //1883 for Rpi; 8883 for AWS
+char mqtt_user[20] = "mqtt_user";   
 char mqtt_pass[20] = "mqtt_pass";
+
+char aws_thing[20] = "Canary";          //AWS Thing
 
 int forget;               //To forget previous network
 int CO2 = 0;              //Equivalent Carbon Dioxide reading
@@ -46,15 +44,24 @@ String aqiCategory = "";
 String data_json; 
 bool lcd_k = false;       //For LCD display
 
+LiquidCrystal_I2C lcd(0x3F, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE);
+SoftwareSerial pmsSerial(14, 13);
+
+WiFiClientSecure espClient;
+
+//See connect_mqttBroker() in MQTT tab
+PubSubClient client(espClient); //set  MQTT port number to 8883 as per //standard
 
 ////*****Setup*****//
 void setup() {
   Serial.begin(115200);
+  Serial.setDebugOutput(true);
   pmsSerial.begin(9600);
 
+  readAWS_cert_key();      ////Read aws certificate and private key on Flash
   readConfig_Mqtt();      ////Configure MQTT FS before connection
-  connect_wifi();         ////Connect to Wifi and MQTT server
-  connect_mqttBroker();   ////Connect to mqtt broker
+  connect_wifi();         ////Connect to Wifi and MQTT server 
+  connect_AWS_MQTT();     ////Connect to mqtt broker
 
   pinMode(13, INPUT);     ////To disconnect and forget previous network
   
@@ -74,7 +81,6 @@ void setup() {
   lcd.setCursor(0,1);    
   lcd.print("Color  |Category");
   delay(2000);    
-
 
 ////Initialize Sensors
 //Initialize PMS5003 (PM2.5)  
@@ -106,7 +112,6 @@ void setup() {
   delay(1000); // //This is only here to make it easier to catch the startup messages.  It isn't required :)
   }
 }
-
 
 void loop() {
   client.loop();
@@ -143,7 +148,7 @@ void loop() {
   Serialize(); //see JSON
 
 //MQTT Test
-  //client.publish("dev/test", "Hello from ESP8266");
+  //client.publish("dev/test", "Hello from ESP8266");   //Test publish
   
   String sensor_data = "{device:" + data_json + "}";
   char sensor_data_buffer[256];
@@ -151,6 +156,5 @@ void loop() {
   
   client.subscribe("dev/test");                   //Subscribe to topic "dev/test"
   client.publish("dev/test",sensor_data_buffer);  //Publish sensor data to topic "dev/test"
-
-  delay(3000);                     //Publish data every 3 second
+  delay(3000);                                    //Publish data every 3 second
 }

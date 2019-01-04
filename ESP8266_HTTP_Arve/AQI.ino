@@ -1,10 +1,10 @@
 float computeAQI (float PM2_5Value){
   float aqiValue;
 
-  if (PM2_5Value >= 0.0 && PM2_5Value <= 12.0)  {         
-    aqiValue = map(PM2_5Value, 0.0, 12.0, 0, 50);         
+  if (PM2_5Value >= 0.0 && PM2_5Value <= 12.0)  {
+    aqiValue = map(PM2_5Value, 0.0, 12.0, 0, 50);
   }
-  else if (PM2_5Value >= 12.1 && PM2_5Value <= 35.4) {    
+  else if (PM2_5Value >= 12.1 && PM2_5Value <= 35.4) {
     aqiValue = map(PM2_5Value, 12.1, 35.4, 50.1, 100);
   }
   else if (PM2_5Value >= 35.5 && PM2_5Value <= 55.4) {
@@ -48,9 +48,10 @@ String setAQIColor (float AQI){
     color = "Maroon";
   }
 
+/////////////////////////////////  writeAqiLight(AQI);
+
   return color;
 }
-
 
 String setAQICategory (float AQI){
   String category;
