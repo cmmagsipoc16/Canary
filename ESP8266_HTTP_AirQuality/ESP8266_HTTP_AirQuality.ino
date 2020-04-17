@@ -36,123 +36,126 @@ bool lcd_k = false;   //For LCD display
 
 ////*****Setup*****//
 void setup() {
-  Serial.begin(115200);
-  pmsSerial.begin(9600);
+    Serial.begin(115200);
+    pmsSerial.begin(9600);
 
-////Connect to wifi
-  connect_wifi();
-////To disconnect and forget previous network
-  pinMode(13, INPUT);
-  
-while (WiFi.status() != WL_CONNECTED){
-  delay(500);
-  Serial.println("Waiting for connection");
-}
+  ////Connect to wifi
+    connect_wifi();
+  ////To disconnect and forget previous network
+    pinMode(13, INPUT);
 
-////Software I2C  
-  Wire.begin(SDA_PIN, SCL_PIN); //(SDA,SCL)
-  
-////LCD
-  lcd.begin(16,2); // LCD is 16x2
-  lcd.clear();
-  lcd.setCursor(0,0);
-  lcd.print("PM 2.5 | AQI");
-  lcd.setCursor(0,1);    
-  lcd.print("Color  |Category");
-  delay(2000);    
-
-////Initialize Sensors
-  //For PM2.5  
-  Serial.print("Initializing PMS5003...");
-  if (initPM25()){
-    Serial.println("done.");
-  }
-  else {
-    Serial.println("failed.");
-  }
-  
-  //For SHT31
-  Serial.print("Initializing SHT31...");
-  if (initSHT31()){
-    Serial.println("done.");
-  }
-  else {
-    Serial.println("failed.");
+  while (WiFi.status() != WL_CONNECTED){
+      delay(500);
+      Serial.println("Waiting for connection");
   }
 
-  //For SGP30
-  Serial.print("Initializing SGP30...");
-   if (initSGP30()){ 
-    Serial.println("done.");
+  ////Software I2C  
+    Wire.begin(SDA_PIN, SCL_PIN); //(SDA,SCL)
+
+  ////LCD
+    lcd.begin(16,2); // LCD is 16x2
+    lcd.clear();
+    lcd.setCursor(0,0);
+    lcd.print("PM 2.5 | AQI");
+    lcd.setCursor(0,1);    
+    lcd.print("Color  |Category");
+    delay(2000);    
+
+  ////Initialize Sensors
+    //For PM2.5  
+    Serial.print("Initializing PMS5003...");
+    if (initPM25()){
+        Serial.println("done.");
     }
-  else {
-    Serial.println("failed.");
+    else {
+        Serial.println("failed.");
+    }
 
-  delay(1000); // Time for opening Serial monitor :)
-  }
+    //For SHT31
+    Serial.print("Initializing SHT31...");
+    if (initSHT31()){
+        Serial.println("done.");
+    }
+    else {
+        Serial.println("failed.");
+    }
+
+    //For SGP30
+    Serial.print("Initializing SGP30...");
+     if (initSGP30()){ 
+        Serial.println("done.");
+     }
+    else {
+        Serial.println("failed.");
+
+        delay(1000); // Time for opening Serial monitor :)
+    }
 }
 
 
 void loop() {
 
-  mac = WiFi.macAddress();
-  PM2_5 = readPM25();
-  t = ceilf(readTempSHT31() *100) / 100;      //rounded up to 2 decimal places
-  h = ceilf(readHumiditySHT31()*100) / 100;   //rounded up to 2 decimal places
-  readSGP30_Baseline ();                      //for accurate CO2 and VOC reading
-  CO2 = readCO2SGP30();
-  VOC = readTVOCSGP30();
-  aqi = computeAQI(PM2_5);
-  aqiColor = setAQIColor(aqi);
-  aqiCategory = setAQICategory (aqi);
+    mac = WiFi.macAddress();    //arve endpoint needed this before
 
-//Switching Parameters on LCD Display  
-  if(lcd_k){
-    LCD_Param1();
-  }
-  else{
-    LCD_Param2();
-  }
+    //Sensor Reading
+    PM2_5 = readPM25();
+    t = ceilf(readTempSHT31() *100) / 100;      //rounded up to 2 decimal places
+    h = ceilf(readHumiditySHT31()*100) / 100;   //rounded up to 2 decimal places
+    readSGP30_Baseline ();                      //for accurate CO2 and VOC reading
+    CO2 = readCO2SGP30();
+    VOC = readTVOCSGP30();
+    aqi = computeAQI(PM2_5);
+    aqiColor = setAQIColor(aqi);
+    aqiCategory = setAQICategory (aqi);
 
-//Push button to forget previous network
-  forget = digitalRead(13);   //reads GPIO 13
-  if(forget == LOW){
-    forget_network();
-    Serial.println("wifi disconnected!");
-    ESP.reset();
-    delay(2000);
-  }
+    //Switching Parameters on LCD Display  
+    if(lcd_k){
+        LCD_Param1();
+    }
+    else{
+        LCD_Param2();
+    }
 
-//Display on Serial for debugging
-  Serialize(); //see JSON
+    //Push button to forget previous network
+    forget = digitalRead(13);   //reads GPIO 13
+    if(forget == LOW){
+        forget_network();
+        Serial.println("wifi disconnected!");
+        ESP.reset();
+        delay(2000);
+    }
+
+    //Display on Serial for debugging
+    Serialize(); //see JSON
 
 
-//HTTP Request
-  if(WiFi.status() == WL_CONNECTED){    //Check WiFi connection status
-    HTTPClient arve;      //Declare object of class HTTPClient
+    //HTTP Request
+    if(WiFi.status() == WL_CONNECTED){    //Check WiFi connection status
+        HTTPClient arve;      //Declare object of class HTTPClient
 
-//    arve.begin(http_destination());                            //Specify request destination (for real Arve API)
-    arve.begin("http://jsonplaceholder.typicode.com/posts/1");   //Specify request destination
-    
-//    arve.addHeader("Content-Type", "text/plain");               //Specify content-type header
-    arve.addHeader("Content-Type", "application/json");           //Specify content-type header
+       //Using real Arve API:
+        //arve.begin(http_destination());                            //Specify request destination (for real Arve API)
+        //arve.addHeader("Content-Type", "text/plain");               //Specify content-type header
+        //int postRequest = arve.POST("Hello from Arve");             //Send a POST request
+        //int patchRequest = arve.PATCH("{device:" + data_json + "}");     //Send a PATCH request to real Arve API 
 
-    //int postRequest = arve.POST("Hello from Arve");             //Send a POST request
-    
-    int patchRequest = arve.PATCH(data_json);                     //Send a PATCH request to dummy API
-    //int patchRequest = arve.PATCH("{device:" + data_json + "}");     //Send a PATCH request to real Arve API 
-    //String patchRequest = "{device:" + data_json + "}";         //For Troubleshooting
-    String payload = arve.getString();                            //Get the response payload    
+        //Using dummy API:
+        arve.begin("http://jsonplaceholder.typicode.com/posts/1");   //Specify request destination
+        arve.addHeader("Content-Type", "application/json");           //Specify content-type header
+        int patchRequest = arve.PATCH(data_json);                     //Send a PATCH request to dummy API
+        //String patchRequest = "{device:" + data_json + "}";         //For Troubleshooting
 
-    //Serial.println(postRequest); 
-    Serial.println(patchRequest);
-    Serial.println(payload);
-   
-    arve.end();   //Close connection
-  }
-  else{
-    Serial.println("Error in WiFi connection");
-  }
+        String payload = arve.getString();                            //Get the response payload    
 
-  delay(5000); //Send data only for every 5 seconds
+        //Serial.println(postRequest); 
+        Serial.println(patchRequest);
+        Serial.println(payload);
+
+        arve.end();   //Close connection
+    }
+    else{
+        Serial.println("Error in WiFi connection");
+    }
+
+    delay(5000); //Send data only for every 5 seconds
 }
