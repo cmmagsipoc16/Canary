@@ -111,7 +111,9 @@ void setup() {
 void loop() {
   client.loop();
 
-  mac = WiFi.macAddress();
+  mac = WiFi.macAddress();    //arve endpoint needed this before
+  
+  // Sensor reading
   PM2_5 = readPM25();
   t = ceilf(readTempSHT31() *100) / 100;      //rounded up to 2 decimal places
   h = ceilf(readHumiditySHT31()*100) / 100;   //rounded up to 2 decimal places
@@ -122,7 +124,7 @@ void loop() {
   aqiColor = setAQIColor(aqi);
   aqiCategory = setAQICategory (aqi);
 
-//Switching Parameters on LCD Display  
+  //Switching Parameters on LCD Display  
   if(lcd_k){
     LCD_Param1();
   }
@@ -130,7 +132,7 @@ void loop() {
     LCD_Param2();
   }
 
-//Push button to forget previous network
+  //Push button to forget previous network
   forget = digitalRead(13);
   if(forget == LOW){
     forget_network();
@@ -139,12 +141,13 @@ void loop() {
     delay(2000);
   }
 
-//Display on Serial for debugging
+  //Display sensor data on Serial for debugging
   Serialize(); //see JSON
 
-//MQTT Test
+  //MQTT Test
   //client.publish("dev/test", "Hello from ESP8266");
   
+  //Publish sensor data over MQTT 
   String sensor_data = "{device:" + data_json + "}";
   char sensor_data_buffer[256];
   sensor_data.toCharArray(sensor_data_buffer,256);
