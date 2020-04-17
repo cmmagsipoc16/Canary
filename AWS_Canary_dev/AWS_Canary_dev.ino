@@ -54,107 +54,109 @@ PubSubClient client(espClient); //set  MQTT port number to 8883 as per //standar
 
 ////*****Setup*****//
 void setup() {
-  Serial.begin(115200);
-  Serial.setDebugOutput(true);
-  pmsSerial.begin(9600);
+    Serial.begin(115200);
+    Serial.setDebugOutput(true);
+    pmsSerial.begin(9600);
 
-  readAWS_cert_key();      ////Read aws certificate and private key on Flash
-  readConfig_Mqtt();      ////Configure MQTT FS before connection
-  connect_wifi();         ////Connect to Wifi and MQTT server 
-  connect_AWS_MQTT();     ////Connect to mqtt broker
+    readAWS_cert_key();      ////Read aws certificate and private key on Flash
+    readConfig_Mqtt();      ////Configure MQTT FS before connection
+    connect_wifi();         ////Connect to Wifi and MQTT server 
+    connect_AWS_MQTT();     ////Connect to mqtt broker
 
-  pinMode(13, INPUT);     ////To disconnect and forget previous network
-  
-  while (WiFi.status() != WL_CONNECTED){    
-    delay(500);
-    Serial.println("Waiting for connection");
-  }
-  
-////Software I2C  
-  Wire.begin(SDA_PIN, SCL_PIN); //(SDA,SCL)
-  
-////Initialize LCD
-  lcd.begin(16,2);        // LCD is 16x2
-  lcd.clear();
-  lcd.setCursor(0,0);
-  lcd.print("PM 2.5 | AQI");
-  lcd.setCursor(0,1);    
-  lcd.print("Color  |Category");
-  delay(2000);    
+    pinMode(13, INPUT);     ////To disconnect and forget previous network
 
-////Initialize Sensors
-//Initialize PMS5003 (PM2.5)  
-  Serial.print("Initializing PMS5003...");
-  if (initPM25()){
-    Serial.println("done.");
-  }
-  else {
-    Serial.println("failed.");
-  }
-  
-//Initialize SHT31 (Temperature and Humidity Sensor)
-  Serial.print("Initializing SHT31...");
-  if (initSHT31()){
-    Serial.println("done.");
-  }
-  else {
-    Serial.println("failed.");
-  }
-
-//Initialize SGP30 (Gas Sensor)
-  Serial.print("Initializing SGP30...");
-   if (initSGP30()){ 
-    Serial.println("done.");
+    while (WiFi.status() != WL_CONNECTED){    
+        delay(500);
+        Serial.println("Waiting for connection");
     }
-  else {
-    Serial.println("failed.");
+  
+    ////Software I2C  
+    Wire.begin(SDA_PIN, SCL_PIN); //(SDA,SCL)
+  
+    ////Initialize LCD
+    lcd.begin(16,2);        // LCD is 16x2
+    lcd.clear();
+    lcd.setCursor(0,0);
+    lcd.print("PM 2.5 | AQI");
+    lcd.setCursor(0,1);    
+    lcd.print("Color  |Category");
+    delay(2000);    
 
-  delay(1000); // //This is only here to make it easier to catch the startup messages.  It isn't required :)
-  }
+    ////Initialize Sensors
+    //Initialize PMS5003 (PM2.5)  
+    Serial.print("Initializing PMS5003...");
+    if (initPM25()){
+        Serial.println("done.");
+    }
+    else {
+        Serial.println("failed.");
+    }
+
+    //Initialize SHT31 (Temperature and Humidity Sensor)
+    Serial.print("Initializing SHT31...");
+    if (initSHT31()){
+        Serial.println("done.");
+    }
+    else {
+        Serial.println("failed.");
+    }
+
+    //Initialize SGP30 (Gas Sensor)
+    Serial.print("Initializing SGP30...");
+    if (initSGP30()){ 
+        Serial.println("done.");
+    }
+    else {
+        Serial.println("failed.");
+    }
+    delay(1000); // //This is only here to make it easier to catch the startup messages.  It isn't required :)
 }
 
 void loop() {
-  client.loop();
+    client.loop();
 
-  mac = WiFi.macAddress();
-  PM2_5 = readPM25();
-  t = ceilf(readTempSHT31() *100) / 100;      //rounded up to 2 decimal places
-  h = ceilf(readHumiditySHT31()*100) / 100;   //rounded up to 2 decimal places
-  readSGP30_Baseline ();                      //for accurate CO2 and VOC reading
-  CO2 = readCO2SGP30();
-  VOC = readTVOCSGP30();
-  aqi = computeAQI(PM2_5);
-  aqiColor = setAQIColor(aqi);
-  aqiCategory = setAQICategory (aqi);
+    mac = WiFi.macAddress();                    //Arve endpoint needed this before
+    
+    //Sensor Reading
+    PM2_5 = readPM25();
+    t = ceilf(readTempSHT31() *100) / 100;      //rounded up to 2 decimal places
+    h = ceilf(readHumiditySHT31()*100) / 100;   //rounded up to 2 decimal places
+    readSGP30_Baseline ();                      //for accurate CO2 and VOC reading
+    CO2 = readCO2SGP30();
+    VOC = readTVOCSGP30();
+    aqi = computeAQI(PM2_5);
+    aqiColor = setAQIColor(aqi);
+    aqiCategory = setAQICategory (aqi);
 
-//Switching Parameters on LCD Display  
-  if(lcd_k){
-    LCD_Param1();
-  }
-  else{
-    LCD_Param2();
-  }
+    //Switching Parameters on LCD Display  
+    if(lcd_k){
+        LCD_Param1();
+    }
+    else{
+        LCD_Param2();
+    }
 
-//Push button to forget previous network
-  forget = digitalRead(13);
-  if(forget == LOW){
-    forget_network();
-    Serial.println("wifi and mqtt disconnected and forgotten!");
-    ESP.reset();
-    delay(2000);
-  }
+    //Push button to forget previous network
+    forget = digitalRead(13);
+    if(forget == LOW){
+        forget_network();
+        Serial.println("wifi and mqtt disconnected and forgotten!");
+        ESP.reset();
+        delay(2000);
+    }
 
-//Display on Serial for debugging
-  Serialize(); //see JSON
+    //Display on Serial for debugging
+    Serialize(); //see JSON
 
-//MQTT Test
-  //client.publish("dev/test", "Hello from ESP8266");   //Test publish
-  
-  String sensor_data = "{device:" + data_json + "}";
-  char sensor_data_buffer[256];
-  sensor_data.toCharArray(sensor_data_buffer,256);
-  
-  client.subscribe("dev/test");                   //Subscribe to topic "dev/test"
-  client.publish("dev/test",sensor_data_buffer);  //Publish sensor data to topic "dev/test"
-  delay(3000);                                    //Publish data every 3 second
+    //MQTT Test
+    //client.publish("dev/test", "Hello from ESP8266");   //Test publish
+
+    //Subscribe and Publish sensor data over MQTT topic
+    String sensor_data = "{device:" + data_json + "}";
+    char sensor_data_buffer[256];
+    sensor_data.toCharArray(sensor_data_buffer,256);
+
+    client.subscribe("dev/test");                   //Subscribe to topic "dev/test"
+    client.publish("dev/test",sensor_data_buffer);  //Publish sensor data to topic "dev/test"
+    delay(3000);                                    //Publish data every 3 second
 }
